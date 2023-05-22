@@ -42,7 +42,7 @@ def plot_efficient_frontier_and_max_sharpe(mu, S):
 	return fig
 
 st.set_page_config(page_title = "Bohmian's Stock Portfolio Optimizer", layout = "wide")
-st.header("Bohmian's Stock Portfolio Optimizer")
+st.header("Bohmian's Stock Portfolio Optimizer. Created and designed by [Gorilla Group]")
 
 col1, col2 = st.columns(2)
 
