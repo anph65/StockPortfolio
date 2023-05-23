@@ -16,7 +16,7 @@ from io import BytesIO
 
 def plot_cum_returns(data, title):    
 	daily_cum_returns = 1 + data.dropna().pct_change()
-	daily_cum_returns = daily_cum_returns.cumprod()*100
+	daily_cum_returns = daily_cum_returns.cumprod()*initial_investment
 	fig = px.line(daily_cum_returns, title=title)
 	return fig
 	
@@ -67,7 +67,7 @@ try:
 	# Plot Individual Stock Prices
 	fig_price = px.line(stocks_df, title='Price of Individual Stocks')
 	# Plot Individual Cumulative Returns
-	fig_cum_returns = plot_cum_returns(stocks_df, 'Cumulative Returns of Individual Stocks Starting with $100')
+	fig_cum_returns = plot_cum_returns(stocks_df, 'Cumulative Returns of Individual Stocks', initial_investment)
 	# Calculatge and Plot Correlation Matrix between Stocks
 	corr_df = stocks_df.corr().round(2)
 	fig_corr = px.imshow(corr_df, text_auto=True, title = 'Correlation between Stocks')
@@ -97,7 +97,7 @@ try:
 		stocks_df['Optimized Portfolio'] += stocks_df[ticker]*weight
 	
 	# Plot Cumulative Returns of Optimized Portfolio
-	fig_cum_returns_optimized = plot_cum_returns(stocks_df['Optimized Portfolio'], 'Cumulative Returns of Optimized Portfolio Starting with $100')
+	fig_cum_returns_optimized = plot_cum_returns(stocks_df['Optimized Portfolio'], 'Cumulative Returns of Optimized Portfolio')
 	
 	# Display everything on Streamlit
 	st.subheader("Your Portfolio Consists of {} Stocks".format(tickers_string))	
