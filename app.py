@@ -14,122 +14,125 @@ import seaborn as sns
 from datetime import datetime
 from io import BytesIO
 
-def plot_cum_returns(data, title):    
-	daily_cum_returns = 1 + data.dropna().pct_change()
-	daily_cum_returns = daily_cum_returns.cumprod()*initial_investment
-	fig = px.line(daily_cum_returns, title=title)
-	return fig
-	
-def plot_efficient_frontier_and_max_sharpe(mu, S): 
-	# Optimize portfolio for max Sharpe ratio and plot it out with efficient frontier curve
-	ef = EfficientFrontier(mu, S)
-	fig, ax = plt.subplots(figsize=(6,4))
-	ef_max_sharpe = copy.deepcopy(ef)
-	plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False)
-	# Find the max sharpe portfolio
-	ef_max_sharpe.max_sharpe(risk_free_rate=0.05) 
-	# https://ycharts.com/indicators/1_year_treasury_rate#:~:text=Basic%20Info,long%20term%20average%20of%202.88%25.
-	ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
-	ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="r", label="Max Sharpe")
-	# Generate random portfolios
-	n_samples = 10000
-	w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
-	rets = w.dot(ef.expected_returns)
-	stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
-	sharpes = rets / stds
-	ax.scatter(stds, rets, marker=".", c=sharpes, cmap="viridis_r")
-	# Output
-	ax.legend()
-	return fig
+def plot_cum_returns(data, title, initial_investment):
+    daily_cum_returns = 1 + data.dropna().pct_change()
+    cumulative_returns = daily_cum_returns.cumprod() * initial_investment
+    fig = px.line(cumulative_returns, title=title)
+    return fig
 
-st.set_page_config(page_title = "Gorilla Group's Stock Portfolio Optimizer", layout = "wide")
+def plot_efficient_frontier_and_max_sharpe(mu, S): 
+    # Optimize portfolio for max Sharpe ratio and plot it out with efficient frontier curve
+    ef = EfficientFrontier(mu, S)
+    fig, ax = plt.subplots(figsize=(6,4))
+    ef_max_sharpe = copy.deepcopy(ef)
+    plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False)
+    # Find the max sharpe portfolio
+    ef_max_sharpe.max_sharpe(risk_free_rate=0.05) 
+    # https://ycharts.com/indicators/1_year_treasury_rate#:~:text=Basic%20Info,long%20term%20average%20of%202.88%25.
+    ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
+    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="r", label="Max Sharpe")
+    # Generate random portfolios
+    n_samples = 10000
+    w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
+    rets = w.dot(ef.expected_returns)
+    stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
+    sharpes = rets / stds
+    ax.scatter(stds, rets, marker=".", c=sharpes, cmap="viridis_r")
+    # Output
+    ax.legend()
+    return fig
+
+st.set_page_config(page_title="Gorilla Group's Stock Portfolio Optimizer", layout="wide")
 st.header("Gorilla Group's Stock Portfolio Optimizer")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-	start_date = st.date_input("Start Date",datetime(2013, 1, 1))
-	
+    start_date = st.date_input("Start Date", datetime(2013, 1, 1))
+
 with col2:
-	end_date = st.date_input("End Date") # it defaults to current date
-	
+    end_date = st.date_input("End Date") # it defaults to current date
+    
 with col3:
-	investment_amount = st.number_input('Enter your investment amount', value=0.0)
+    initial_investment = st.number_input('Enter initial investment amount', value=100)
 
-
-tickers_string = st.text_input('Enter all stock tickers to be included in portfolio separated by commas \
-								WITHOUT spaces, e.g. "MA,META,V,AMZN,JPM,BA"', '').upper()
+tickers_string = st.text_input('Enter all stock tickers to be included in the portfolio separated by commas \
+                                WITHOUT spaces, e.g. "MA,META,V,AMZN,JPM,BA"', '').upper()
 tickers = tickers_string.split(',')
 
 try:
-	# Get Stock Prices using pandas_datareader Library	
-	stocks_df = yf.download(tickers, start=start_date, end=end_date)['Adj Close']
-	# Plot Individual Stock Prices
-	fig_price = px.line(stocks_df, title='Price of Individual Stocks')
-	# Plot Individual Cumulative Returns
-	fig_cum_returns = plot_cum_returns(stocks_df, 'Cumulative Returns of Individual Stocks', initial_investment)
-	# Calculatge and Plot Correlation Matrix between Stocks
-	corr_df = stocks_df.corr().round(2)
-	fig_corr = px.imshow(corr_df, text_auto=True, title = 'Correlation between Stocks')
-		
-	# Calculate expected returns and sample covariance matrix for portfolio optimization later
-	mu = expected_returns.mean_historical_return(stocks_df)
-	S = risk_models.sample_cov(stocks_df)
-	
-	# Plot efficient frontier curve
-	fig = plot_efficient_frontier_and_max_sharpe(mu, S)
-	fig_efficient_frontier = BytesIO()
-	fig.savefig(fig_efficient_frontier, format="png")
-	
-	# Get optimized weights
-	ef = EfficientFrontier(mu, S)
-	ef.max_sharpe(risk_free_rate=0.02)
-	weights = ef.clean_weights()
-	expected_annual_return, annual_volatility, sharpe_ratio = ef.portfolio_performance()
-	weights_df = pd.DataFrame.from_dict(weights, orient = 'index')
-	weights_df.columns = ['weights']
-	# Get the number of stock 
-	da = DiscreteAllocation(weights_df, latest_prices = get_latest_prices(inp), total_portfolio_value=investment_amount)
-	allocation, leftover = da.lp_portfolio()
-	# Calculate returns of portfolio with optimized weights
-	stocks_df['Optimized Portfolio'] = 0
-	for ticker, weight in weights.items():
-		stocks_df['Optimized Portfolio'] += stocks_df[ticker]*weight
-	
-	# Plot Cumulative Returns of Optimized Portfolio
-	fig_cum_returns_optimized = plot_cum_returns(stocks_df['Optimized Portfolio'], 'Cumulative Returns of Optimized Portfolio')
-	
-	# Display everything on Streamlit
-	st.subheader("Your Portfolio Consists of {} Stocks".format(tickers_string))	
-	st.plotly_chart(fig_cum_returns_optimized)
-	
-	st.subheader("Optimized Max Sharpe Portfolio Weights")
-	st.dataframe(weights_df)
-	st.subheader("The number of stock you should buy")
-	st.dataframe(allocation)
-	st.subheader("The remaining amount")
-	st.dataframe(leftover)
-	st.subheader("Optimized Max Sharpe Portfolio Performance")
-	st.image(fig_efficient_frontier)
-	
-	st.subheader('Expected annual return: {}%'.format((expected_annual_return*100).round(2)))
-	st.subheader('Annual volatility: {}%'.format((annual_volatility*100).round(2)))
-	st.subheader('Sharpe Ratio: {}'.format(sharpe_ratio.round(2)))
-	
-	st.plotly_chart(fig_corr) # fig_corr is not a plotly chart
-	st.plotly_chart(fig_price)
-	st.plotly_chart(fig_cum_returns)
-	
+    # Get Stock Prices using pandas_datareader Library	
+    stocks_df = yf.download(tickers, start=start_date, end=end_date)['Adj Close']
+    # Plot Individual Stock Prices
+    fig_price = px.line(stocks_df, title='Price of Individual Stocks')
+    # Plot Individual Cumulative Returns
+    fig_cum_returns = plot_cum_returns(stocks_df, 'Cumulative Returns of Individual Stocks', initial_investment)
+    #
+    # Calculate and plot the correlation matrix between stocks
+    corr_df = stocks_df.corr().round(2)
+    fig_corr = px.imshow(corr_df, text_auto=True, title='Correlation between Stocks')
 
-	
+    # Calculate expected returns and sample covariance matrix for portfolio optimization later
+    mu = expected_returns.mean_historical_return(stocks_df)
+    S = risk_models.sample_cov(stocks_df)
+
+    # Plot efficient frontier curve
+    fig = plot_efficient_frontier_and_max_sharpe(mu, S)
+    fig_efficient_frontier = BytesIO()
+    fig.savefig(fig_efficient_frontier, format="png")
+
+    # Get optimized weights
+    ef = EfficientFrontier(mu, S)
+    ef.max_sharpe(risk_free_rate=0.02)
+    weights = ef.clean_weights()
+    expected_annual_return, annual_volatility, sharpe_ratio = ef.portfolio_performance()
+    weights_df = pd.DataFrame.from_dict(weights, orient='index')
+    weights_df.columns = ['weights']
+
+    # Get the number of stocks to buy
+    da = DiscreteAllocation(weights_df, latest_prices=get_latest_prices(tickers), total_portfolio_value=initial_investment)
+    allocation, leftover = da.lp_portfolio()
+
+    # Calculate returns of the portfolio with optimized weights
+    stocks_df['Optimized Portfolio'] = 0
+    for ticker, weight in weights.items():
+        stocks_df['Optimized Portfolio'] += stocks_df[ticker] * weight
+
+    # Plot Cumulative Returns of Optimized Portfolio
+    fig_cum_returns_optimized = plot_cum_returns(stocks_df['Optimized Portfolio'], 'Cumulative Returns of Optimized Portfolio', initial_investment)
+
+    # Display everything on Streamlit
+    st.subheader("Your Portfolio Consists of {} Stocks".format(tickers_string))
+    st.plotly_chart(fig_cum_returns_optimized)
+
+    st.subheader("Optimized Max Sharpe Portfolio Weights")
+    st.dataframe(weights_df)
+
+    st.subheader("The number of stocks you should buy")
+    st.dataframe(allocation)
+
+    st.subheader("The remaining amount")
+    st.dataframe(leftover)
+
+    st.subheader("Optimized Max Sharpe Portfolio Performance")
+    st.image(fig_efficient_frontier)
+
+    st.subheader('Expected annual return: {}%'.format((expected_annual_return * 100).round(2)))
+    st.subheader('Annual volatility: {}%'.format((annual_volatility * 100).round(2)))
+    st.subheader('Sharpe Ratio: {}'.format(sharpe_ratio.round(2)))
+
+    st.plotly_chart(fig_corr)  # fig_corr is not a plotly chart
+    st.plotly_chart(fig_price)
+    st.plotly_chart(fig_cum_returns)
+
 except:
-	st.write('Enter correct stock tickers to be included in portfolio separated\
-	by commas WITHOUT spaces, e.g. "MA,META,V,AMZN,JPM,BA"and hit Enter.')	
-	
+    st.write('Enter correct stock tickers to be included in the portfolio separated \
+    by commas WITHOUT spaces, e.g. "MA,META,V,AMZN,JPM,BA" and hit Enter.')
+
 hide_streamlit_style = """
 <style>
-#MainMenu {visibility: hidden;}
+# MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 </style>
 """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True) 
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
