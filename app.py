@@ -54,8 +54,8 @@ with col2:
 	end_date = st.date_input("End Date") # it defaults to current date
 	
 with col3:
-	investment_amount=st.num_input('Enter yout investment amount'))
-	
+	investment_amount = st.num_input('Enter your investment amount')
+
 
 tickers_string = st.text_input('Enter all stock tickers to be included in portfolio separated by commas \
 								WITHOUT spaces, e.g. "MA,META,V,AMZN,JPM,BA"', '').upper()
